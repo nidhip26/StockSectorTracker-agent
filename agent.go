@@ -100,12 +100,9 @@ func main() {
                 fetchStocks(client)
             }
       }
-   }()
+    }()
 
-    time.Sleep(15 * time.Minute)
-    ticker.Stop()
-    done <- true
-    fmt.Println("Ticker stopped")
+    select {}    
     
 
 }
