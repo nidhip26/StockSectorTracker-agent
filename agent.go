@@ -7,6 +7,7 @@ import (
     "io/ioutil"
     "net/http"
     "time"
+    "os"
     loggly "github.com/jamespearly/loggly"
 )
 
@@ -33,9 +34,11 @@ type myStruct struct{
 
 }
 
-func fetchStocks(client *loggly.ClientType){
-    c := http.Client{Timeout: time.Duration(1) * time.Second}                                     
-    req, err := http.NewRequest("GET", "https://financialmodelingprep.com/api/v3/quote/AAPL,UNH,JPM,AMZN,PG,XOM,NEE,DOW,TMUS,AMT?apikey=bk5WxsGZsq2LrzdFBqQHu82YQOUv5Hkd", nil)
+func fetchStocks(client *loggly.ClientType, apiKey string){
+    c := http.Client{Timeout: time.Duration(1) * time.Second}
+   // req, err := http.NewRequest("GET", "https://financialmodelingprep.com/api/v3/quote/AAPL,UNH,JPM,AMZN,PG,XOM,NEE,DOW,TMUS,AMT?apikey=bk5WxsGZsq2LrzdFBqQHu82YQOUv5Hkd", nil)
+    reqURL := fmt.Sprintf("https://financialmodelingprep.com/api/v3/quote/AAPL,UNH,JPM,AMZN,PG,XOM,NEE,DOW,TMUS,AMT?apikey=%s", apiKey)
+    req, err := http.NewRequest("GET", reqURL, nil)
     if err != nil {
         fmt.Printf("error %s", err)
         message := fmt.Sprintf("Error creating request: %s", err)
@@ -58,7 +61,7 @@ func fetchStocks(client *loggly.ClientType){
         return
     }
     //fmt.Printf("Body : %s", body)
-    
+
 
     var myJSON []myStruct
     if err:= json.Unmarshal(body, &myJSON); err!=nil{
@@ -68,10 +71,11 @@ func fetchStocks(client *loggly.ClientType){
     }
     message := fmt.Sprintf("Fetched %d records successfully.", len(myJSON))
     client.Send("info", message)
-    fmt.Printf("Go Structure:\t%+v\n", myJSON)
-
+    //fmt.Printf("Go Structure:\t%+v\n", myJSON)
+    for _, stock := range myJSON {
+        fmt.Printf("%+v\n", stock)
+    }
 }
-
 
 func main() {
 
@@ -82,13 +86,19 @@ func main() {
     client := loggly.New(tag)
 
     interval := flag.Int("interval", 1, "Ticker interval in minutes")
-    flag.Parse()    
+    flag.Parse()
+
+    apiKey := os.Getenv("API_KEY")
+    if apiKey == "" {
+        fmt.Println("API_KEY environment variable is not set.")
+        return
+    }
 
     ticker := time.NewTicker(time.Duration(*interval) * time.Minute)
     defer ticker.Stop()
 
-    fetchStocks(client)
-    
+    fetchStocks(client, apiKey)
+
     done := make(chan bool)
     go func() {
         for {
@@ -97,12 +107,11 @@ func main() {
                 return
             case t := <-ticker.C:
                 fmt.Println("Tick at", t)
-                fetchStocks(client)
+                fetchStocks(client, apiKey)
             }
       }
     }()
 
-    select {}    
-    
-
+    select {}
 }
+
