@@ -1,18 +1,27 @@
-#Start the go app build
-From golang:latest AS build
+# Stage 1: Build the Go application
+FROM golang:latest AS build
 
+# Set the working directory inside the container
 WORKDIR /app
 
+# Copy the Go module files and the source code
 COPY go.mod go.sum agent.go ./
 
-#download dependencies
+# Download dependencies
 RUN go mod download
 
-#show the contents
-RUN pwd && find ./
+RUN CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -o agent agent.go
 
-#identify listening port
+FROM scratch
+
+# Copy the statically compiled Go binary from the build stage
+COPY --from=build /app/agent /app/
+
+# Copy CA certificates from the build stage (from Golang base image)
+COPY --from=build /etc/ssl/certs /etc/ssl/certs
+
+# Expose the necessary port
 EXPOSE 8080
 
-#start the application
-CMD ["go", "run", "agent.go"]
+# Set the command to run the Go application
+CMD ["/app/agent", "-interval=15"]
